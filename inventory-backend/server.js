@@ -37,16 +37,8 @@ app.use(
 app.use(express.json());
 
 // ==========================================
-// 2. Root & Health Check Routes
+// 2. Health Check (Vital for Cloud Deployments)
 // ==========================================
-app.get('/', (req, res) => {
-  res.status(200).json({
-    success: true,
-    message: 'Inventory Backend API is running successfully!',
-    healthCheck: '/api/health',
-  });
-});
-
 app.get('/api/health', (req, res) => {
   res.status(200).json({
     status: 'healthy',
