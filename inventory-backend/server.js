@@ -1,6 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 const dotenv = require('dotenv');
+const path = require('path');
 const connectDB = require('./config/db');
 
 // Load environment variables
@@ -37,16 +38,8 @@ app.use(
 app.use(express.json());
 
 // ==========================================
-// 2. Root & Health Check Routes
+// 2. Health Check Route
 // ==========================================
-app.get('/', (req, res) => {
-  res.status(200).json({
-    success: true,
-    message: 'Inventory Backend API is running successfully!',
-    healthCheck: '/api/health',
-  });
-});
-
 app.get('/api/health', (req, res) => {
   res.status(200).json({
     status: 'healthy',
@@ -66,6 +59,29 @@ app.use('/api/suppliers', require('./routes/supplierRoutes'));
 app.use('/api/purchases', require('./routes/purchaseRoutes'));
 app.use('/api/supplier-payments', require('./routes/supplierPaymentRoutes'));
 app.use('/api/dashboard', require('./routes/dashboardRoutes'));
+
+// ==========================================
+// 3.5. Serve Frontend in Production
+// ==========================================
+if (process.env.NODE_ENV === 'production') {
+  // NOTE: Change 'frontend' below to match your frontend folder name (e.g., 'client')
+  const frontendDistPath = path.join(__dirname, '../frontend/dist');
+
+  app.use(express.static(frontendDistPath));
+
+  app.get('*', (req, res) => {
+    res.sendFile(path.resolve(frontendDistPath, 'index.html'));
+  });
+} else {
+  // Root route for development mode
+  app.get('/', (req, res) => {
+    res.status(200).json({
+      success: true,
+      message: 'Inventory Backend API is running successfully!',
+      healthCheck: '/api/health',
+    });
+  });
+}
 
 // ==========================================
 // 4. Error Handling Middlewares
