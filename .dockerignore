@@ -1,0 +1,31 @@
+# ============================================================================
+# Baykeep — Docker Ignore Rules
+# Place this file in the project root directory (BAYKEEP/.dockerignore)
+# ============================================================================
+
+# Dependencies
+node_modules
+**/node_modules
+npm-debug.log*
+
+# Build outputs
+dist
+**/dist
+build
+**/build
+
+# Environment & secrets (injected at runtime via env_file / environment)
+.env
+.env.*
+**/.env
+**/.env.*
+
+# Git & IDE files
+.git
+.gitignore
+.vscode
+.idea
+
+# OS metadata
+.DS_Store
+Thumbs.db
