@@ -64,22 +64,13 @@ app.use('/api/dashboard', require('./routes/dashboardRoutes'));
 // 3.5. Serve Frontend in Production
 // ==========================================
 if (process.env.NODE_ENV === 'production') {
-  // NOTE: Change 'frontend' below to match your frontend folder name (e.g., 'client')
-  const frontendDistPath = path.join(__dirname, '../frontend/dist');
+  // Corrected from 'frontend' to 'client' to match your repository folder
+  const frontendDistPath = path.join(__dirname, '../client/dist');
 
   app.use(express.static(frontendDistPath));
 
   app.get('*', (req, res) => {
     res.sendFile(path.resolve(frontendDistPath, 'index.html'));
-  });
-} else {
-  // Root route for development mode
-  app.get('/', (req, res) => {
-    res.status(200).json({
-      success: true,
-      message: 'Inventory Backend API is running successfully!',
-      healthCheck: '/api/health',
-    });
   });
 }
 
