@@ -2,6 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const dotenv = require('dotenv');
 const path = require('path');
+const fs = require('fs');
 const connectDB = require('./config/db');
 
 // Load environment variables
@@ -64,13 +65,29 @@ app.use('/api/dashboard', require('./routes/dashboardRoutes'));
 // 3.5. Serve Frontend in Production
 // ==========================================
 if (process.env.NODE_ENV === 'production') {
-  // Corrected from 'frontend' to 'client' to match your repository folder
   const frontendDistPath = path.join(__dirname, '../client/dist');
 
   app.use(express.static(frontendDistPath));
 
-  app.get('*', (req, res) => {
-    res.sendFile(path.resolve(frontendDistPath, 'index.html'));
+  app.get('*', (req, res, next) => {
+    const indexPath = path.resolve(frontendDistPath, 'index.html');
+    if (fs.existsSync(indexPath)) {
+      res.sendFile(indexPath);
+    } else {
+      res.status(404).json({
+        success: false,
+        message: 'Frontend build files not found. Please check Render build logs.',
+      });
+    }
+  });
+} else {
+  // Root route for development mode
+  app.get('/', (req, res) => {
+    res.status(200).json({
+      success: true,
+      message: 'Inventory Backend API is running successfully!',
+      healthCheck: '/api/health',
+    });
   });
 }
 
