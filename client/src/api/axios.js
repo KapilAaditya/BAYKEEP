@@ -2,7 +2,8 @@ import axios from 'axios';
 
 // Create pre-configured Axios instance
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:5000/api',
+  // Use relative '/api' in production (Render), and localhost for local development
+  baseURL: import.meta.env.MODE === 'production' ? '/api' : 'http://localhost:5000/api',
   headers: {
     'Content-Type': 'application/json',
   },
