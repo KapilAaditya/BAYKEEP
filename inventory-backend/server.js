@@ -26,7 +26,6 @@ const allowedOrigins = [
 app.use(
   cors({
     origin: (origin, callback) => {
-      // Allow requests with no origin (like mobile apps, curl, or Postman)
       if (!origin || allowedOrigins.includes(origin)) {
         return callback(null, true);
       }
@@ -65,23 +64,24 @@ app.use('/api/dashboard', require('./routes/dashboardRoutes'));
 // 3.5. Serve Frontend in Production
 // ==========================================
 if (process.env.NODE_ENV === 'production') {
-  const frontendDistPath = path.join(__dirname, '../client/dist');
+  const frontendDistPath = path.resolve(__dirname, '../client/dist');
+  console.log('Serving frontend from:', frontendDistPath);
+  console.log('Directory exists:', fs.existsSync(frontendDistPath));
 
   app.use(express.static(frontendDistPath));
 
   app.get('*', (req, res, next) => {
-    const indexPath = path.resolve(frontendDistPath, 'index.html');
+    const indexPath = path.join(frontendDistPath, 'index.html');
     if (fs.existsSync(indexPath)) {
       res.sendFile(indexPath);
     } else {
       res.status(404).json({
         success: false,
-        message: 'Frontend build files not found. Please check Render build logs.',
+        message: `Frontend build files not found at ${frontendDistPath}`,
       });
     }
   });
 } else {
-  // Root route for development mode
   app.get('/', (req, res) => {
     res.status(200).json({
       success: true,
