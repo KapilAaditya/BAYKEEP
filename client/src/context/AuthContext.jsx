@@ -8,7 +8,6 @@ export const AuthProvider = ({ children }) => {
   const [token, setToken] = useState(localStorage.getItem('baykeep_token') || null);
   const [loading, setLoading] = useState(true);
 
-  // Restore authenticated session from localStorage on initial page load
   useEffect(() => {
     const initializeAuth = async () => {
       const storedToken = localStorage.getItem('baykeep_token');
@@ -18,12 +17,10 @@ export const AuthProvider = ({ children }) => {
         try {
           setUser(JSON.parse(storedUser));
           setToken(storedToken);
-          // Optional: Verify token with backend
           const res = await api.get('/auth/me');
           setUser(res.data.data);
           localStorage.setItem('baykeep_user', JSON.stringify(res.data.data));
         } catch (err) {
-          console.error('Session expired or invalid:', err);
           logout();
         }
       }
@@ -33,7 +30,6 @@ export const AuthProvider = ({ children }) => {
     initializeAuth();
   }, []);
 
-  // Login handler
   const login = async (email, password) => {
     const res = await api.post('/auth/login', { email, password });
     const { token: receivedToken, ...userData } = res.data.data;
@@ -46,11 +42,24 @@ export const AuthProvider = ({ children }) => {
     return userData;
   };
 
-  // Registration handler
-  const register = async (name, email, password, role) => {
-    const res = await api.post('/auth/register', { name, email, password, role });
-    const { token: receivedToken, ...userData } = res.data.data;
+  const register = async (name, email, password, role, adminEmail) => {
+    const res = await api.post('/auth/register', {
+      name,
+      email,
+      password,
+      role,
+      adminEmail,
+    });
 
+    // If Staff or Manager registered, they must wait for Admin approval
+    if (res.data.pendingApproval) {
+      return {
+        pendingApproval: true,
+        message: res.data.message,
+      };
+    }
+
+    const { token: receivedToken, ...userData } = res.data.data;
     setToken(receivedToken);
     setUser(userData);
     localStorage.setItem('baykeep_token', receivedToken);
@@ -59,7 +68,6 @@ export const AuthProvider = ({ children }) => {
     return userData;
   };
 
-  // Logout handler
   const logout = () => {
     setToken(null);
     setUser(null);
@@ -86,7 +94,6 @@ export const AuthProvider = ({ children }) => {
   );
 };
 
-// Custom hook for convenient consumption
 export const useAuth = () => {
   const context = useContext(AuthContext);
   if (!context) {

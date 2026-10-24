@@ -1,13 +1,9 @@
 const jwt = require('jsonwebtoken');
 const { User } = require('../models/User');
 
-/**
- * Middleware: Verify JWT and attach current user to req.user
- */
 const protect = async (req, res, next) => {
   let token;
 
-  // Check if token exists in Authorization header (Format: Bearer <token>)
   if (
     req.headers.authorization &&
     req.headers.authorization.startsWith('Bearer')
@@ -23,10 +19,7 @@ const protect = async (req, res, next) => {
   }
 
   try {
-    // Verify token with secret key
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-
-    // Fetch user from database and attach to request (excluding password)
     const user = await User.findById(decoded.id).select('-password');
 
     if (!user) {
@@ -34,6 +27,18 @@ const protect = async (req, res, next) => {
         success: false,
         message: 'The user belonging to this token no longer exists.',
       });
+    }
+
+    if (!user.isApproved) {
+      return res.status(403).json({
+        success: false,
+        message: 'Your account is pending approval from your Admin.',
+      });
+    }
+
+    // Ensure organizationId is always populated
+    if (!user.organizationId) {
+      user.organizationId = user._id;
     }
 
     req.user = user;
@@ -47,10 +52,6 @@ const protect = async (req, res, next) => {
   }
 };
 
-/**
- * Middleware: Restrict access to specified roles
- * @param  {...string} roles - e.g. 'admin', 'manager'
- */
 const authorize = (...roles) => {
   return (req, res, next) => {
     if (!req.user || !roles.includes(req.user.role)) {

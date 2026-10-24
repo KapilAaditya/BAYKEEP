@@ -6,6 +6,8 @@ const {
   loginUser,
   getMe,
   getAllUsers,
+  approveUser,
+  deleteUser,
   updateUserRole,
 } = require('../controllers/authController');
 
@@ -21,11 +23,13 @@ const {
 router.post('/register', validateRequest(registerUserSchema), registerUser);
 router.post('/login', validateRequest(loginUserSchema), loginUser);
 
-// Private Routes (Requires valid token)
+// Private Routes
 router.get('/me', protect, getMe);
 
-// Admin-Only Routes
+// Admin-Only Workspace User Management Routes
 router.get('/users', protect, authorize('admin'), getAllUsers);
+router.patch('/users/:id/approve', protect, authorize('admin'), approveUser);
+router.delete('/users/:id', protect, authorize('admin'), deleteUser);
 router.patch(
   '/users/:id/role',
   protect,

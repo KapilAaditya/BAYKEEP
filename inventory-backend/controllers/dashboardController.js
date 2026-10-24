@@ -3,15 +3,12 @@ const { Supplier } = require('../models/Supplier');
 const { Transaction } = require('../models/Transaction');
 const { Purchase } = require('../models/Purchase');
 
-/**
- * @desc    Get aggregated dashboard KPIs and overview metrics
- * @route   GET /api/dashboard/stats
- * @access  Private
- */
 const getDashboardStats = async (req, res, next) => {
   try {
-    // 1. Inventory Aggregations: Total items, total units, valuation, low stock count
+    const orgId = req.user.organizationId;
+
     const [inventoryStats] = await Item.aggregate([
+      { $match: { organizationId: orgId } },
       {
         $group: {
           _id: null,
@@ -27,8 +24,8 @@ const getDashboardStats = async (req, res, next) => {
       },
     ]);
 
-    // 2. Dealer Payables Aggregations: Total debt owed and total paid
     const [supplierStats] = await Supplier.aggregate([
+      { $match: { organizationId: orgId } },
       {
         $group: {
           _id: null,
@@ -40,19 +37,17 @@ const getDashboardStats = async (req, res, next) => {
       },
     ]);
 
-    // 3. Purchase Bills Count
-    const totalPurchases = await Purchase.countDocuments({});
+    const totalPurchases = await Purchase.countDocuments({ organizationId: orgId });
 
-    // 4. Critical Red Items (top 5 lowest stock items for quick dashboard table)
     const criticalItems = await Item.find({
+      organizationId: orgId,
       $expr: { $lte: ['$quantity', '$lowStockThreshold'] },
     })
       .populate('category', 'name')
       .sort({ quantity: 1 })
       .limit(5);
 
-    // 5. Recent Activity (last 5 stock transactions)
-    const recentActivity = await Transaction.find({})
+    const recentActivity = await Transaction.find({ organizationId: orgId })
       .populate('item', 'name sku unit')
       .populate('performedBy', 'name')
       .sort({ createdAt: -1 })
@@ -65,13 +60,13 @@ const getDashboardStats = async (req, res, next) => {
           totalProducts: inventoryStats?.totalProducts || 0,
           totalUnits: inventoryStats?.totalUnits || 0,
           totalValuation: inventoryStats?.totalValuation || 0,
-          lowStockCount: inventoryStats?.lowStockCount || 0, // Number of items in red state
+          lowStockCount: inventoryStats?.lowStockCount || 0,
         },
         financials: {
           totalSuppliers: supplierStats?.totalSuppliers || 0,
           totalBilled: supplierStats?.totalBilled || 0,
           totalPaid: supplierStats?.totalPaid || 0,
-          totalOwedToDealers: supplierStats?.totalBalanceDue || 0, // Overall debt
+          totalOwedToDealers: supplierStats?.totalBalanceDue || 0,
           totalPurchases,
         },
         criticalItems,
@@ -83,6 +78,4 @@ const getDashboardStats = async (req, res, next) => {
   }
 };
 
-module.exports = {
-  getDashboardStats,
-};
+module.exports = { getDashboardStats };

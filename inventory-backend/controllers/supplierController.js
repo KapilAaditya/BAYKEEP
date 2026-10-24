@@ -1,37 +1,32 @@
 const { Supplier } = require('../models/Supplier');
 const { Purchase } = require('../models/Purchase');
 
-// Get all suppliers with optional search and sort
 const getSuppliers = async (req, res, next) => {
   try {
     const { search, sortBy = 'balanceDue' } = req.query;
-    const filter = {};
+    const filter = { organizationId: req.user.organizationId };
 
     if (search) {
       filter.$or = [
-        { name: { $regex: search,$options: 'i' } },
-        { phone: { $regex: search,$options: 'i' } },
-        { contactPerson: { $regex: search,$options: 'i' } },
+        { name: { $regex: search, $options: 'i' } },
+        { phone: { $regex: search, $options: 'i' } },
+        { contactPerson: { $regex: search, $options: 'i' } },
       ];
     }
 
     const sortOrder = sortBy === 'balanceDue' ? { balanceDue: -1 } : { name: 1 };
     const suppliers = await Supplier.find(filter).sort(sortOrder);
 
-    res.status(200).json({
-      success: true,
-      count: suppliers.length,
-      data: suppliers,
-    });
+    res.status(200).json({ success: true, count: suppliers.length, data: suppliers });
   } catch (err) {
     next(err);
   }
 };
 
-// Summary metrics: total outstanding debt across all suppliers
 const getSupplierDebtSummary = async (req, res, next) => {
   try {
     const totals = await Supplier.aggregate([
+      { $match: { organizationId: req.user.organizationId } },
       {
         $group: {
           _id: null,
@@ -56,10 +51,12 @@ const getSupplierDebtSummary = async (req, res, next) => {
   }
 };
 
-// Single supplier details
 const getSupplierById = async (req, res, next) => {
   try {
-    const supplier = await Supplier.findById(req.params.id);
+    const supplier = await Supplier.findOne({
+      _id: req.params.id,
+      organizationId: req.user.organizationId,
+    });
     if (!supplier) {
       return res.status(404).json({ success: false, message: 'Supplier not found' });
     }
@@ -69,11 +66,11 @@ const getSupplierById = async (req, res, next) => {
   }
 };
 
-// Create a new supplier
 const createSupplier = async (req, res, next) => {
   try {
     const { name, contactPerson, phone, email, address, notes } = req.body;
     const supplier = await Supplier.create({
+      organizationId: req.user.organizationId,
       name,
       contactPerson,
       phone,
@@ -83,45 +80,46 @@ const createSupplier = async (req, res, next) => {
       createdBy: req.user._id,
     });
 
-    res.status(201).json({
-      success: true,
-      message: 'Supplier created successfully',
-      data: supplier,
-    });
+    res.status(201).json({ success: true, data: supplier });
   } catch (err) {
     next(err);
   }
 };
 
-// Update an existing supplier
 const updateSupplier = async (req, res, next) => {
   try {
-    const supplier = await Supplier.findById(req.params.id);
+    const supplier = await Supplier.findOne({
+      _id: req.params.id,
+      organizationId: req.user.organizationId,
+    });
     if (!supplier) {
       return res.status(404).json({ success: false, message: 'Supplier not found' });
     }
 
-    const updatableKeys = ['name', 'contactPerson', 'phone', 'email', 'address', 'notes'];
-    updatableKeys.forEach((key) => {
-      if (req.body[key] !== undefined) supplier[key] = req.body[key];
+    const keys = ['name', 'contactPerson', 'phone', 'email', 'address', 'notes'];
+    keys.forEach((k) => {
+      if (req.body[k] !== undefined) supplier[k] = req.body[k];
     });
 
     await supplier.save();
-    res.status(200).json({ success: true, message: 'Supplier updated', data: supplier });
+    res.status(200).json({ success: true, data: supplier });
   } catch (err) {
     next(err);
   }
 };
 
-// Delete a supplier (if no existing purchases are linked)
 const deleteSupplier = async (req, res, next) => {
   try {
-    const supplier = await Supplier.findById(req.params.id);
+    const orgId = req.user.organizationId;
+    const supplier = await Supplier.findOne({ _id: req.params.id, organizationId: orgId });
     if (!supplier) {
       return res.status(404).json({ success: false, message: 'Supplier not found' });
     }
 
-    const linkedPurchases = await Purchase.countDocuments({ supplier: supplier._id });
+    const linkedPurchases = await Purchase.countDocuments({
+      organizationId: orgId,
+      supplier: supplier._id,
+    });
     if (linkedPurchases > 0) {
       return res.status(400).json({
         success: false,
@@ -130,7 +128,7 @@ const deleteSupplier = async (req, res, next) => {
     }
 
     await supplier.deleteOne();
-    res.status(200).json({ success: true, message: 'Supplier deleted successfully' });
+    res.status(200).json({ success: true, message: 'Supplier deleted' });
   } catch (err) {
     next(err);
   }
