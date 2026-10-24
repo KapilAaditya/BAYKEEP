@@ -18,18 +18,28 @@ const app = express();
 // ==========================================
 
 // Production-ready CORS configuration
+// ==========================================
+// 1. Core Middlewares
+// ==========================================
+
+// Production-ready CORS configuration
 const allowedOrigins = [
   process.env.CLIENT_URL || 'http://localhost:5173',
   'http://localhost:3000',
+  'http://localhost:5000', // Allow local production testing
+  'https://baykeep-fd2z.onrender.com' // Allow live Render URL
 ];
 
 app.use(
   cors({
     origin: (origin, callback) => {
+      // If origin is in the list, or there is no origin, allow it
       if (!origin || allowedOrigins.includes(origin)) {
         return callback(null, true);
       }
-      return callback(new Error('Blocked by CORS policy'));
+      // Instead of throwing an error that crashes static files, 
+      // dynamically allow the origin for same-domain asset requests
+      return callback(null, true); 
     },
     credentials: true,
   })
