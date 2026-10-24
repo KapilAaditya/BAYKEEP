@@ -63,14 +63,27 @@ app.use('/api/dashboard', require('./routes/dashboardRoutes'));
 // ==========================================
 // 3.5. Serve Frontend in Production
 // ==========================================
+// ==========================================
+// 3.5. Serve Frontend in Production
+// ==========================================
 if (process.env.NODE_ENV === 'production') {
   const frontendDistPath = path.resolve(__dirname, '../client/dist');
   console.log('Serving frontend from:', frontendDistPath);
   console.log('Directory exists:', fs.existsSync(frontendDistPath));
 
-  app.use(express.static(frontendDistPath));
+  // Serve static assets with proper configuration
+  app.use(express.static(frontendDistPath, {
+    maxAge: '1d', // Cache static assets for performance
+    etag: true
+  }));
 
+  // Catch-all route for React Router (only for non-file requests)
   app.get('*', (req, res, next) => {
+    // If the request is for an API route or a static file with an extension, skip it
+    if (req.path.startsWith('/api') || req.path.includes('.')) {
+      return next();
+    }
+
     const indexPath = path.join(frontendDistPath, 'index.html');
     if (fs.existsSync(indexPath)) {
       res.sendFile(indexPath);
