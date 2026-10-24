@@ -1,3 +1,4 @@
+import { BaykeepLogo } from './Logo';
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import {
@@ -8,7 +9,6 @@ import {
   Tags,
   ShieldAlert,
   LogOut,
-  Warehouse,
 } from 'lucide-react';
 
 const Layout = () => {
@@ -38,14 +38,8 @@ const Layout = () => {
       <aside className="w-64 border-r border-slate-200 bg-white flex flex-col justify-between shadow-sm">
         <div>
           {/* Brand Header */}
-          <div className="flex items-center gap-3 px-6 py-5 border-b border-slate-100">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-indigo-600 text-white shadow-sm">
-              <Warehouse className="h-6 w-6" />
-            </div>
-            <div>
-              <h1 className="text-xl font-bold tracking-tight text-slate-900">Baykeep</h1>
-              <p className="text-xs font-medium text-slate-400">Inventory & Ledger</p>
-            </div>
+          <div className="px-6 py-5 border-b border-slate-100">
+            <BaykeepLogo />
           </div>
 
           {/* Navigation Links */}

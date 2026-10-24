@@ -1,3 +1,4 @@
+import { BaykeepIcon } from '../components/Logo';
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
@@ -34,8 +35,8 @@ const Login = () => {
       <div className="w-full max-w-md bg-white rounded-2xl shadow-xl shadow-slate-200/50 border border-slate-100 p-8">
         {/* Brand Header */}
         <div className="text-center mb-8">
-          <div className="inline-flex h-12 w-12 items-center justify-center rounded-xl bg-indigo-600 text-white shadow-md shadow-indigo-200 mb-3">
-            <Warehouse className="h-6 w-6" />
+          <div className="inline-flex h-12 w-12 items-center justify-center mb-3">
+            <BaykeepIcon className="h-12 w-12" />
           </div>
           <h2 className="text-2xl font-bold tracking-tight text-slate-900">Welcome to Baykeep</h2>
           <p className="text-sm text-slate-500 mt-1">Sign in to your inventory workspace</p>
