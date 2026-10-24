@@ -63,23 +63,24 @@ app.use('/api/dashboard', require('./routes/dashboardRoutes'));
 // ==========================================
 // 3.5. Serve Frontend in Production
 // ==========================================
+// ==========================================
+// 3.5. Serve Frontend in Production
+// ==========================================
 if (process.env.NODE_ENV === 'production') {
   const frontendDistPath = path.resolve(__dirname, '../client/dist');
   console.log('Serving frontend from:', frontendDistPath);
-  console.log('Directory exists:', fs.existsSync(frontendDistPath));
+  
+  // 1. EXPLICITLY serve the assets folder first
+  app.use('/assets', express.static(path.join(frontendDistPath, 'assets')));
 
-  // Serve static files correctly from dist
+  // 2. Serve other static files (like favicon, manifest, etc.)
   app.use(express.static(frontendDistPath));
 
-  // Catch-all route for React Router (only for non-API and non-file requests)
+  // 3. Catch-all route for React Router
   app.get('*', (req, res, next) => {
-    // Skip API routes
-    if (req.path.startsWith('/api')) {
-      return next();
-    }
-
-    // If a static asset (like .js, .css, .ico, .png) is requested but missing, 
-    // return a 404 directly instead of falling into the error handler
+    if (req.path.startsWith('/api')) return next();
+    
+    // Return 404 for missing assets instead of crashing
     if (req.path.includes('.')) {
       return res.status(404).send('Asset not found');
     }
@@ -88,13 +89,10 @@ if (process.env.NODE_ENV === 'production') {
     if (fs.existsSync(indexPath)) {
       res.sendFile(indexPath);
     } else {
-      res.status(404).json({
-        success: false,
-        message: `Frontend build files not found at ${frontendDistPath}`,
-      });
+      res.status(404).json({ success: false, message: 'Frontend build not found.' });
     }
   });
-} else {
+}else {
   // Root route for development mode
   app.get('/', (req, res) => {
     res.status(200).json({
