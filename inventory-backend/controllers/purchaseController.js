@@ -47,8 +47,13 @@ const createPurchase = async (req, res, next) => {
         totalCost: lineTotal,
       });
 
+      // Calculate weighted purchase cost per unit so Stock Valuation matches Purchased Bills
       const previousQuantity = dbItem.quantity;
-      dbItem.quantity += qty;
+      const previousValuation = previousQuantity * (dbItem.unitPrice || 0);
+      const newQuantity = previousQuantity + qty;
+
+      dbItem.unitPrice = newQuantity > 0 ? (previousValuation + lineTotal) / newQuantity : cost;
+      dbItem.quantity = newQuantity;
       await dbItem.save();
 
       await Transaction.create({
@@ -58,7 +63,8 @@ const createPurchase = async (req, res, next) => {
         quantityChanged: qty,
         previousQuantity,
         newQuantity: dbItem.quantity,
-        reason: `Purchase Bill #${billNumber} from ${supplier.name}`,
+        unitCost: cost,
+        reason: `Purchase Bill #${billNumber} from ${supplier.name} (@ ₹${cost}/unit)`,
         performedBy: req.user._id,
       });
     }
@@ -105,7 +111,7 @@ const createPurchase = async (req, res, next) => {
 
     const populated = await purchase.populate([
       { path: 'supplier', select: 'name phone' },
-      { path: 'items.item', select: 'name sku unit' },
+      { path: 'items.item', select: 'name sku unit unitPrice' },
     ]);
 
     res.status(201).json({ success: true, data: populated });
@@ -125,7 +131,7 @@ const getPurchases = async (req, res, next) => {
     const [purchases, total] = await Promise.all([
       Purchase.find(query)
         .populate('supplier', 'name phone')
-        .populate('items.item', 'name sku unit')
+        .populate('items.item', 'name sku unit unitPrice')
         .populate('createdBy', 'name')
         .sort({ purchaseDate: -1 })
         .skip(skip)
@@ -178,7 +184,12 @@ const deletePurchase = async (req, res, next) => {
       const item = await Item.findOne({ _id: entry.item, organizationId: orgId });
       if (item) {
         const previousQuantity = item.quantity;
-        item.quantity = Math.max(0, item.quantity - entry.quantity);
+        const previousValuation = previousQuantity * (item.unitPrice || 0);
+        const revertedValuation = Math.max(0, previousValuation - entry.totalCost);
+        const newQuantity = Math.max(0, previousQuantity - entry.quantity);
+
+        item.quantity = newQuantity;
+        item.unitPrice = newQuantity > 0 ? revertedValuation / newQuantity : 0;
         await item.save();
 
         await Transaction.create({
@@ -188,6 +199,8 @@ const deletePurchase = async (req, res, next) => {
           quantityChanged: -entry.quantity,
           previousQuantity,
           newQuantity: item.quantity,
+          unitCost: entry.unitCost,
+          costDeducted: entry.totalCost,
           reason: `Deleted/Cancelled Purchase Bill #${purchase.billNumber}`,
           performedBy: req.user._id,
         });
@@ -214,7 +227,7 @@ const deletePurchase = async (req, res, next) => {
 
     res.status(200).json({
       success: true,
-      message: `Purchase bill #${purchase.billNumber} deleted and stock/balances reverted.`,
+      message: `Purchase bill #${purchase.billNumber} deleted and stock valuation reverted.`,
     });
   } catch (error) {
     next(error);

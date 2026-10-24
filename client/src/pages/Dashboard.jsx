@@ -220,10 +220,12 @@ const Dashboard = () => {
                       <div>
                         <h4 className="text-sm font-semibold text-slate-900">{tx.item?.name || 'Deleted Item'}</h4>
                         <p className="text-xs text-slate-400 mt-0.5">
-                          {tx.reason} • by {tx.performedBy?.name || 'Staff'}
+                          {tx.reason} by {tx.performedBy?.name || 'Staff'}
                         </p>
                       </div>
                     </div>
+                    
+                    {/* Integrated custom right-side details block */}
                     <div className="text-right">
                       <span
                         className={`text-sm font-bold ${
@@ -232,10 +234,16 @@ const Dashboard = () => {
                       >
                         {isPositive ? `+${tx.quantityChanged}` : tx.quantityChanged} {tx.item?.unit || ''}
                       </span>
+                      {isOut && tx.totalSaleAmount > 0 && (
+                        <p className="text-[11px] font-semibold text-emerald-700 mt-0.5">
+                          Sold: ₹{tx.totalSaleAmount.toLocaleString()} (Eval -₹{(tx.costDeducted || 0).toLocaleString()})
+                        </p>
+                      )}
                       <p className="text-[11px] text-slate-400 mt-0.5">
                         New total: {tx.newQuantity}
                       </p>
                     </div>
+
                   </div>
                 );
               })

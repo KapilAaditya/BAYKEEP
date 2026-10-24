@@ -5,7 +5,7 @@ const recordStockMovement = async (req, res, next) => {
   try {
     const orgId = req.user.organizationId;
     const { itemId } = req.params;
-    const { type, quantity, reason } = req.body;
+    const { type, quantity, sellingPrice = 0, reason } = req.body;
 
     const item = await Item.findOne({ _id: itemId, organizationId: orgId });
     if (!item) {
@@ -13,8 +13,11 @@ const recordStockMovement = async (req, res, next) => {
     }
 
     const previousQuantity = item.quantity;
+    const purchaseUnitCost = item.unitPrice || 0;
     let newQuantity = previousQuantity;
     let quantityChanged = 0;
+    let totalSaleAmount = 0;
+    let costDeducted = 0;
 
     if (type === 'IN') {
       newQuantity = previousQuantity + quantity;
@@ -28,6 +31,9 @@ const recordStockMovement = async (req, res, next) => {
       }
       newQuantity = previousQuantity - quantity;
       quantityChanged = -quantity;
+      totalSaleAmount = quantity * Number(sellingPrice);
+      // Deduct the item's purchase cost from overall Stock Valuation
+      costDeducted = quantity * purchaseUnitCost;
     } else if (type === 'ADJUSTMENT') {
       newQuantity = quantity;
       quantityChanged = newQuantity - previousQuantity;
@@ -43,13 +49,21 @@ const recordStockMovement = async (req, res, next) => {
       quantityChanged,
       previousQuantity,
       newQuantity,
-      reason: reason || `${type} operation recorded`,
+      unitCost: purchaseUnitCost,
+      sellingPrice: type === 'OUT' ? Number(sellingPrice) : 0,
+      totalSaleAmount,
+      costDeducted,
+      reason:
+        reason ||
+        (type === 'OUT'
+          ? `Sold ${quantity} ${item.unit} @ ₹${sellingPrice}/${item.unit}`
+          : `${type} operation recorded`),
       performedBy: req.user._id,
     });
 
     const populated = await transaction.populate([
       { path: 'performedBy', select: 'name email role' },
-      { path: 'item', select: 'name sku unit' },
+      { path: 'item', select: 'name sku unit unitPrice' },
     ]);
 
     res.status(201).json({
@@ -61,6 +75,7 @@ const recordStockMovement = async (req, res, next) => {
           sku: item.sku,
           previousQuantity,
           newQuantity: item.quantity,
+          unitPrice: item.unitPrice,
           isLowStock: item.isLowStock,
         },
         transaction: populated,
@@ -81,7 +96,7 @@ const getTransactions = async (req, res, next) => {
     const skip = (Number(page) - 1) * Number(limit);
     const [transactions, totalTransactions] = await Promise.all([
       Transaction.find(query)
-        .populate('item', 'name sku unit')
+        .populate('item', 'name sku unit unitPrice')
         .populate('performedBy', 'name email role')
         .sort({ createdAt: -1 })
         .skip(skip)

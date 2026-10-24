@@ -3,16 +3,12 @@ import { useSearchParams } from 'react-router-dom';
 import api from '../api/axios';
 import { useAuth } from '../context/AuthContext';
 import {
-  Boxes,
   Search,
   Plus,
-  Filter,
   AlertTriangle,
-  ArrowUpDown,
   Edit2,
   Trash2,
   X,
-  Check,
   RefreshCw,
 } from 'lucide-react';
 
@@ -20,9 +16,8 @@ const Inventory = () => {
   const [items, setItems] = useState([]);
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [searchParams, setSearchParams] = useSearchParams();
+  const [searchParams] = useSearchParams();
 
-  // Search & Filter States
   const [searchTerm, setSearchTerm] = useState(searchParams.get('search') || '');
   const [selectedCategory, setSelectedCategory] = useState(searchParams.get('category') || '');
   const [showLowStockOnly, setShowLowStockOnly] = useState(searchParams.get('lowStock') === 'true');
@@ -31,8 +26,9 @@ const Inventory = () => {
   const [isItemModalOpen, setIsItemModalOpen] = useState(false);
   const [isStockModalOpen, setIsStockModalOpen] = useState(false);
   const [selectedItem, setSelectedItem] = useState(null);
-  const [stockActionType, setStockActionType] = useState('IN');
+  const [stockActionType, setStockActionType] = useState('OUT');
   const [stockQuantity, setStockQuantity] = useState(1);
+  const [sellingPrice, setSellingPrice] = useState(0);
   const [stockReason, setStockReason] = useState('');
 
   // Form State for Add/Edit Item
@@ -44,14 +40,13 @@ const Inventory = () => {
     quantity: 0,
     unit: 'pcs',
     unitPrice: 0,
-    lowStockThreshold: 5, // Custom limit set by user
-    location: 'Warehouse A',
+    lowStockThreshold: 5,
+    location: 'Main Shelf',
   });
   const [formError, setFormError] = useState('');
 
   const { isManager, isAdmin } = useAuth();
 
-  // Fetch Items from Backend
   const fetchItems = async () => {
     try {
       setLoading(true);
@@ -69,7 +64,6 @@ const Inventory = () => {
     }
   };
 
-  // Fetch Categories for Dropdown
   const fetchCategories = async () => {
     try {
       const res = await api.get('/categories');
@@ -87,7 +81,6 @@ const Inventory = () => {
     fetchItems();
   }, [searchTerm, selectedCategory, showLowStockOnly]);
 
-  // Open modal to create a new item
   const handleOpenCreateModal = () => {
     setSelectedItem(null);
     setItemForm({
@@ -105,7 +98,6 @@ const Inventory = () => {
     setIsItemModalOpen(true);
   };
 
-  // Open modal to edit an existing item
   const handleOpenEditModal = (item) => {
     setSelectedItem(item);
     setItemForm({
@@ -123,7 +115,6 @@ const Inventory = () => {
     setIsItemModalOpen(true);
   };
 
-  // Save Item (Create or Update)
   const handleSaveItem = async (e) => {
     e.preventDefault();
     setFormError('');
@@ -140,7 +131,6 @@ const Inventory = () => {
     }
   };
 
-  // Delete Item
   const handleDeleteItem = async (id) => {
     if (!window.confirm('Are you sure you want to delete this item?')) return;
     try {
@@ -151,12 +141,12 @@ const Inventory = () => {
     }
   };
 
-  // Quick Stock Adjustment
   const handleOpenStockModal = (item, type) => {
     setSelectedItem(item);
     setStockActionType(type);
     setStockQuantity(1);
-    setStockReason(type === 'IN' ? 'Restock / Shipment arrival' : 'Dispatched / Customer Sale');
+    setSellingPrice(item.unitPrice || 0);
+    setStockReason(type === 'IN' ? 'Manual Stock In' : 'Customer Sale');
     setIsStockModalOpen(true);
   };
 
@@ -166,6 +156,7 @@ const Inventory = () => {
       await api.post(`/transactions/item/${selectedItem._id}`, {
         type: stockActionType,
         quantity: Number(stockQuantity),
+        sellingPrice: stockActionType === 'OUT' ? Number(sellingPrice) : 0,
         reason: stockReason,
       });
       setIsStockModalOpen(false);
@@ -175,6 +166,10 @@ const Inventory = () => {
     }
   };
 
+  const purchaseCostPerUnit = selectedItem?.unitPrice || 0;
+  const valuationDeducted = (Number(stockQuantity) || 0) * purchaseCostPerUnit;
+  const totalManualSale = (Number(stockQuantity) || 0) * (Number(sellingPrice) || 0);
+
   return (
     <div className="space-y-6">
       {/* Page Header */}
@@ -182,7 +177,7 @@ const Inventory = () => {
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-slate-900">Inventory Catalog</h1>
           <p className="text-sm text-slate-500 mt-1">
-            Real-time stock tracking with custom threshold alerts
+            Purchase costs are synced from Purchase Bills; selling deducts purchase cost from Stock Valuation
           </p>
         </div>
         {isManager && (
@@ -222,7 +217,6 @@ const Inventory = () => {
           ))}
         </select>
 
-        {/* Low Stock Toggle Button */}
         <button
           onClick={() => setShowLowStockOnly(!showLowStockOnly)}
           className={`flex items-center gap-2 px-3.5 py-2 text-xs font-semibold rounded-lg border transition ${
@@ -244,9 +238,9 @@ const Inventory = () => {
               <tr>
                 <th className="px-6 py-4">Item Details</th>
                 <th className="px-4 py-4">Category</th>
-                <th className="px-4 py-4">Location</th>
-                <th className="px-4 py-4">Unit Price</th>
+                <th className="px-4 py-4">Purchase Cost / Unit</th>
                 <th className="px-4 py-4">Stock Level</th>
+                <th className="px-4 py-4">Stock Valuation</th>
                 <th className="px-4 py-4 text-center">Alert Limit</th>
                 <th className="px-6 py-4 text-right">Actions</th>
               </tr>
@@ -267,6 +261,7 @@ const Inventory = () => {
               ) : (
                 items.map((item) => {
                   const isRed = item.isLowStock;
+                  const itemValuation = (item.quantity || 0) * (item.unitPrice || 0);
                   return (
                     <tr
                       key={item._id}
@@ -276,7 +271,6 @@ const Inventory = () => {
                           : 'hover:bg-slate-50'
                       }`}
                     >
-                      {/* Name & SKU */}
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-2">
                           {isRed && (
@@ -284,27 +278,21 @@ const Inventory = () => {
                           )}
                           <div>
                             <span className="font-semibold text-slate-900 block">{item.name}</span>
-                            <span className="text-xs font-mono text-slate-400">{item.sku}</span>
+                            <span className="text-xs font-mono text-slate-400">{item.sku} • {item.location || 'Main'}</span>
                           </div>
                         </div>
                       </td>
 
-                      {/* Category */}
                       <td className="px-4 py-4 text-slate-600 text-xs">
                         <span className="inline-block px-2.5 py-1 rounded-md bg-slate-100 font-medium">
                           {item.category?.name || 'Uncategorized'}
                         </span>
                       </td>
 
-                      {/* Location */}
-                      <td className="px-4 py-4 text-slate-500 text-xs">{item.location || '—'}</td>
-
-                      {/* Price */}
                       <td className="px-4 py-4 font-medium text-slate-800">
-                        ₹{(item.unitPrice || 0).toLocaleString()}
+                        ₹{(item.unitPrice || 0).toLocaleString(undefined, { maximumFractionDigits: 2 })}
                       </td>
 
-                      {/* Stock Level with Red State */}
                       <td className="px-4 py-4">
                         <span
                           className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold ${
@@ -317,27 +305,28 @@ const Inventory = () => {
                         </span>
                       </td>
 
-                      {/* Alert Limit set by user */}
+                      <td className="px-4 py-4 font-bold text-slate-900">
+                        ₹{itemValuation.toLocaleString(undefined, { maximumFractionDigits: 2 })}
+                      </td>
+
                       <td className="px-4 py-4 text-center font-mono text-xs text-slate-500">
                         {item.lowStockThreshold} {item.unit}
                       </td>
 
-                      {/* Actions */}
                       <td className="px-6 py-4 text-right space-x-1 whitespace-nowrap">
-                        {/* Quick Stock-In / Stock-Out */}
+                        <button
+                          onClick={() => handleOpenStockModal(item, 'OUT')}
+                          title="Sell / Dispatch Stock (-)"
+                          className="px-2.5 py-1 text-xs font-semibold text-amber-800 bg-amber-100 hover:bg-amber-200 rounded-md transition"
+                        >
+                          - Sell / Dispatch
+                        </button>
                         <button
                           onClick={() => handleOpenStockModal(item, 'IN')}
                           title="Stock In (+)"
                           className="px-2 py-1 text-xs font-semibold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 rounded-md transition"
                         >
                           + Stock
-                        </button>
-                        <button
-                          onClick={() => handleOpenStockModal(item, 'OUT')}
-                          title="Stock Out (-)"
-                          className="px-2 py-1 text-xs font-semibold text-amber-700 bg-amber-50 hover:bg-amber-100 rounded-md transition"
-                        >
-                          - Dispatch
                         </button>
 
                         {isManager && (
@@ -466,7 +455,7 @@ const Inventory = () => {
                   />
                 </div>
                 <div>
-                  <label className="block mb-1">Unit Price (₹)</label>
+                  <label className="block mb-1">Purchase Cost (₹)</label>
                   <input
                     type="number"
                     min="0"
@@ -478,7 +467,6 @@ const Inventory = () => {
                 </div>
               </div>
 
-              {/* Custom Alert Limit */}
               <div className="p-3 bg-amber-50/60 rounded-xl border border-amber-200/80">
                 <label className="block text-amber-900 mb-1">
                   Custom Alert Limit (Turn Red When Stock Reaches) *
@@ -491,9 +479,6 @@ const Inventory = () => {
                   onChange={(e) => setItemForm({ ...itemForm, lowStockThreshold: Number(e.target.value) })}
                   className="w-full rounded-lg border border-amber-300 bg-white px-3 py-2 normal-case font-semibold text-slate-900 focus:outline-none focus:ring-1 focus:ring-amber-500"
                 />
-                <p className="text-[11px] normal-case font-normal text-amber-800 mt-1">
-                  When available quantity is at or below this value, the item turns red on the dashboard and inventory table.
-                </p>
               </div>
 
               <div className="flex justify-end gap-3 pt-3">
@@ -516,71 +501,110 @@ const Inventory = () => {
         </div>
       )}
 
-      {/* Quick Stock-In / Stock-Out Modal */}
+      {/* Sell / Dispatch & Stock-In Modal */}
       {isStockModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4">
-          <div className="w-full max-w-sm bg-white rounded-2xl shadow-xl border border-slate-100 p-6">
+          <div className="w-full max-w-md bg-white rounded-2xl shadow-xl border border-slate-100 p-6">
             <div className="flex items-center justify-between pb-3 border-b border-slate-100">
               <h3 className="text-base font-bold text-slate-900">
-                {stockActionType === 'IN' ? 'Stock In (+)' : 'Dispatch / Stock Out (-)'}
+                {stockActionType === 'IN' ? 'Stock In (+)' : 'Sell / Dispatch Stock (-)'}
               </h3>
               <button onClick={() => setIsStockModalOpen(false)} className="text-slate-400 hover:text-slate-600">
                 <X className="h-5 w-5" />
               </button>
             </div>
 
-            <div className="py-3">
-              <p className="text-xs text-slate-400 uppercase font-semibold">Product</p>
-              <h4 className="text-sm font-bold text-slate-900 mt-0.5">{selectedItem?.name}</h4>
-              <p className="text-xs text-slate-500 font-mono mt-0.5">
-                Current count: <span className="font-bold text-slate-900">{selectedItem?.quantity} {selectedItem?.unit}</span>
-              </p>
+            <div className="py-3 flex items-center justify-between border-b border-slate-100">
+              <div>
+                <h4 className="text-sm font-bold text-slate-900">{selectedItem?.name}</h4>
+                <p className="text-xs text-slate-500 font-mono mt-0.5">
+                  Available: <span className="font-bold text-slate-900">{selectedItem?.quantity} {selectedItem?.unit}</span>
+                </p>
+              </div>
+              <div className="text-right">
+                <span className="text-[11px] uppercase font-semibold text-slate-400 block">Purchase Cost</span>
+                <span className="text-sm font-bold text-slate-800">₹{purchaseCostPerUnit.toLocaleString()} / {selectedItem?.unit}</span>
+              </div>
             </div>
 
-            <form onSubmit={handleSaveStockMovement} className="space-y-3">
+            <form onSubmit={handleSaveStockMovement} className="space-y-4 mt-4">
               <div>
                 <label className="block text-xs font-semibold uppercase text-slate-600 mb-1">
-                  Quantity ({selectedItem?.unit})
+                  Quantity ({selectedItem?.unit}) *
                 </label>
                 <input
                   type="number"
                   min="1"
+                  max={stockActionType === 'OUT' ? selectedItem?.quantity : undefined}
                   required
                   value={stockQuantity}
                   onChange={(e) => setStockQuantity(e.target.value)}
-                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-1 focus:ring-indigo-600"
+                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm font-bold text-slate-900 focus:outline-none focus:ring-1 focus:ring-indigo-600"
                 />
               </div>
 
+              {stockActionType === 'OUT' && (
+                <>
+                  <div className="p-3.5 rounded-xl bg-indigo-50/60 border border-indigo-200/80">
+                    <label className="block text-xs font-bold uppercase text-indigo-950 mb-1">
+                      Selling Price per {selectedItem?.unit} (₹) — Set Manually *
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      required
+                      value={sellingPrice}
+                      onChange={(e) => setSellingPrice(e.target.value)}
+                      placeholder="Enter selling price per unit..."
+                      className="w-full rounded-lg border border-indigo-300 bg-white px-3 py-2 text-sm font-bold text-slate-900 focus:outline-none focus:ring-1 focus:ring-indigo-600"
+                    />
+                    <div className="mt-2.5 pt-2.5 border-t border-indigo-200/60 flex items-center justify-between text-xs">
+                      <span className="text-indigo-900 font-medium">Total Sale Amount:</span>
+                      <span className="font-bold text-indigo-700 text-sm">₹{totalManualSale.toLocaleString()}</span>
+                    </div>
+                  </div>
+
+                  <div className="p-3 rounded-xl bg-rose-50/70 border border-rose-200/80 flex items-center justify-between text-xs">
+                    <span className="text-rose-800 font-medium">
+                      Purchase Cost Deducted from Stock Valuation:
+                    </span>
+                    <span className="font-bold text-rose-700 text-sm">
+                      -₹{valuationDeducted.toLocaleString()}
+                    </span>
+                  </div>
+                </>
+              )}
+
               <div>
                 <label className="block text-xs font-semibold uppercase text-slate-600 mb-1">
-                  Reason / Notes
+                  Reason / Customer Note
                 </label>
                 <input
                   type="text"
                   required
                   value={stockReason}
                   onChange={(e) => setStockReason(e.target.value)}
-                  placeholder="e.g. Shipment arrival, Retail dispatch..."
+                  placeholder="e.g. Sold to walk-in customer, Invoice #204..."
                   className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-1 focus:ring-indigo-600"
                 />
               </div>
 
-              <div className="flex justify-end gap-2 pt-3">
+              <div className="flex justify-end gap-2 pt-2">
                 <button
                   type="button"
                   onClick={() => setIsStockModalOpen(false)}
-                  className="px-3 py-1.5 text-xs rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50"
+                  className="px-3.5 py-2 text-xs rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className={`px-4 py-1.5 text-xs font-semibold text-white rounded-lg transition ${
+                  className={`px-4 py-2 text-xs font-semibold text-white rounded-lg transition ${
                     stockActionType === 'IN' ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-amber-600 hover:bg-amber-700'
                   }`}
                 >
-                  Confirm {stockActionType}
+                  {stockActionType === 'IN' ? 'Confirm Stock In' : 'Confirm Sale & Deduct Valuation'}
                 </button>
               </div>
             </form>
