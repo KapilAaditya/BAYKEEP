@@ -63,25 +63,25 @@ app.use('/api/dashboard', require('./routes/dashboardRoutes'));
 // ==========================================
 // 3.5. Serve Frontend in Production
 // ==========================================
-// ==========================================
-// 3.5. Serve Frontend in Production
-// ==========================================
 if (process.env.NODE_ENV === 'production') {
   const frontendDistPath = path.resolve(__dirname, '../client/dist');
   console.log('Serving frontend from:', frontendDistPath);
   console.log('Directory exists:', fs.existsSync(frontendDistPath));
 
-  // Serve static assets with proper configuration
-  app.use(express.static(frontendDistPath, {
-    maxAge: '1d', // Cache static assets for performance
-    etag: true
-  }));
+  // Serve static files correctly from dist
+  app.use(express.static(frontendDistPath));
 
-  // Catch-all route for React Router (only for non-file requests)
+  // Catch-all route for React Router (only for non-API and non-file requests)
   app.get('*', (req, res, next) => {
-    // If the request is for an API route or a static file with an extension, skip it
-    if (req.path.startsWith('/api') || req.path.includes('.')) {
+    // Skip API routes
+    if (req.path.startsWith('/api')) {
       return next();
+    }
+
+    // If a static asset (like .js, .css, .ico, .png) is requested but missing, 
+    // return a 404 directly instead of falling into the error handler
+    if (req.path.includes('.')) {
+      return res.status(404).send('Asset not found');
     }
 
     const indexPath = path.join(frontendDistPath, 'index.html');
@@ -95,6 +95,7 @@ if (process.env.NODE_ENV === 'production') {
     }
   });
 } else {
+  // Root route for development mode
   app.get('/', (req, res) => {
     res.status(200).json({
       success: true,
